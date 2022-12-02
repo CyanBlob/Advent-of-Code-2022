@@ -1,65 +1,94 @@
 use std::fs::File;
 use std::io::BufRead;
 
-#[derive(PartialEq, Eq, Ord)]
-struct Elf {
-    meals: Vec<i32>,
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+enum Selection {
+    Rock = 1,
+    Paper = 2,
+    Scissors = 3,
 }
 
-impl Elf {
-    fn new() -> Self {
-        return Elf {
-            meals: Vec::<i32>::new(),
-        };
-    }
+enum Outcomes {
+    Loss = 0,
+    Draw = 3,
+    Win = 6,
+}
 
-    fn with_meals(meals: &Vec::<i32>) -> Self {
-        return Elf {
-            meals: meals.clone(),
-        };
+impl std::ops::Add<Selection> for Outcomes {
+    type Output = i32;
+
+    fn add(self, rhs: Selection) -> Self::Output {
+        self as i32 + rhs as i32
     }
 }
 
-impl PartialOrd for Elf {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.meals.iter().sum::<i32>().cmp(&other.meals.iter().sum::<i32>()))
+fn get_score(opponent: Selection, player: Selection) -> i32 {
+    match opponent {
+        Selection::Rock => match player {
+            Selection::Rock => Outcomes::Draw + player,
+            Selection::Paper => Outcomes::Win + player,
+            Selection::Scissors => Outcomes::Loss + player,
+        },
+        Selection::Paper => match player {
+            Selection::Rock => Outcomes::Loss + player,
+            Selection::Paper => Outcomes::Draw + player,
+            Selection::Scissors => Outcomes::Win + player,
+        },
+        Selection::Scissors => match player {
+            Selection::Rock => Outcomes::Win + player,
+            Selection::Paper => Outcomes::Loss + player,
+            Selection::Scissors => Outcomes::Draw + player,
+        },
+    }
+}
+
+fn input_to_selection(input: &str) -> Selection {
+    match input {
+        "A" | "X" => Selection::Rock,
+        "B" | "Y" => Selection::Paper,
+        "C" | "Z" => Selection::Scissors,
+        _ => panic!(),
+    }
+}
+
+fn input_to_choice(input: &str) -> Selection {
+    match input {
+        "A X" => Selection::Scissors,
+        "A Y" => Selection::Rock,
+        "A Z" => Selection::Paper,
+        "B X" => Selection::Rock,
+        "B Y" => Selection::Paper,
+        "B Z" => Selection::Scissors,
+        "C X" => Selection::Paper,
+        "C Y" => Selection::Scissors,
+        "C Z" => Selection::Rock,
+        _ => panic!(),
     }
 }
 
 fn main() {
-    let file = File::open("input1.txt").expect("Could not open file");
+    let file = File::open("input2.txt").expect("Could not open file");
 
-    let mut elves: Vec::<Elf> = vec![Elf::new()];
-    
-    let mut meals: Vec::<i32> = vec![];
+    let mut total = 0;
 
     for line in std::io::BufReader::new(file).lines() {
         if let Ok(line) = line {
-            if line.trim() == "" {
-                elves.push(Elf::with_meals(&meals));
-                meals.clear();
-            }
-            else {
-                meals.push(line.parse::<i32>().unwrap());
-            }
+            total += get_score(
+                input_to_selection(&line[0..1]),
+                input_to_selection(&line[line.len() - 1..]),
+            );
         }
     }
-    if elves.len() < 3 {
-        println!("Invalid data; must have 3 or more elves. Have {}", elves.len());
-        return;
+
+    let file = File::open("input2.txt").expect("Could not open file");
+    let mut part_2_total = 0;
+
+    for line in std::io::BufReader::new(file).lines() {
+        if let Ok(line) = line {
+            part_2_total += get_score(input_to_selection(&line[0..1]), input_to_choice(&line));
+        }
     }
 
-    elves.sort();
-    elves.reverse();
-    
-    let mut sum = 0;
-    
-    println!("Top 3: ");
-    for i in 0..3 {
-        let elf_sum = elves[i].meals.iter().sum::<i32>();
-        sum += elf_sum;
-        println!("{}", elf_sum);
-    }
-    
-    println!("Total of top 3 elves: {}", sum);
+    println!("Part 1 total: {}", total);
+    println!("Part 2 total: {}", part_2_total);
 }
