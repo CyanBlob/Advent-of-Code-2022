@@ -1,94 +1,79 @@
 use std::fs::File;
 use std::io::BufRead;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
-enum Selection {
-    Rock = 1,
-    Paper = 2,
-    Scissors = 3,
-}
-
-enum Outcomes {
-    Loss = 0,
-    Draw = 3,
-    Win = 6,
-}
-
-impl std::ops::Add<Selection> for Outcomes {
-    type Output = i32;
-
-    fn add(self, rhs: Selection) -> Self::Output {
-        self as i32 + rhs as i32
-    }
-}
-
-fn get_score(opponent: Selection, player: Selection) -> i32 {
-    match opponent {
-        Selection::Rock => match player {
-            Selection::Rock => Outcomes::Draw + player,
-            Selection::Paper => Outcomes::Win + player,
-            Selection::Scissors => Outcomes::Loss + player,
-        },
-        Selection::Paper => match player {
-            Selection::Rock => Outcomes::Loss + player,
-            Selection::Paper => Outcomes::Draw + player,
-            Selection::Scissors => Outcomes::Win + player,
-        },
-        Selection::Scissors => match player {
-            Selection::Rock => Outcomes::Win + player,
-            Selection::Paper => Outcomes::Loss + player,
-            Selection::Scissors => Outcomes::Draw + player,
-        },
-    }
-}
-
-fn input_to_selection(input: &str) -> Selection {
-    match input {
-        "A" | "X" => Selection::Rock,
-        "B" | "Y" => Selection::Paper,
-        "C" | "Z" => Selection::Scissors,
-        _ => panic!(),
-    }
-}
-
-fn input_to_choice(input: &str) -> Selection {
-    match input {
-        "A X" => Selection::Scissors,
-        "A Y" => Selection::Rock,
-        "A Z" => Selection::Paper,
-        "B X" => Selection::Rock,
-        "B Y" => Selection::Paper,
-        "B Z" => Selection::Scissors,
-        "C X" => Selection::Paper,
-        "C Y" => Selection::Scissors,
-        "C Z" => Selection::Rock,
-        _ => panic!(),
+fn get_char_value(c: &char) -> u32 {
+    match c.is_ascii_lowercase() {
+        true => *c as u32 - 96,
+        false => *c as u32 - 64 + 26,
     }
 }
 
 fn main() {
-    let file = File::open("input2.txt").expect("Could not open file");
+    let file = File::open("input3.txt").expect("Could not open file");
 
-    let mut total = 0;
-
-    for line in std::io::BufReader::new(file).lines() {
-        if let Ok(line) = line {
-            total += get_score(
-                input_to_selection(&line[0..1]),
-                input_to_selection(&line[line.len() - 1..]),
-            );
-        }
-    }
-
-    let file = File::open("input2.txt").expect("Could not open file");
-    let mut part_2_total = 0;
+    let mut priority_sum = 0;
 
     for line in std::io::BufReader::new(file).lines() {
         if let Ok(line) = line {
-            part_2_total += get_score(input_to_selection(&line[0..1]), input_to_choice(&line));
+            line[0..line.len() / 2].chars().any(|c| {
+                if line[line.len() / 2..].contains(c) {
+                    priority_sum += get_char_value(&c);
+                    true
+                } else {
+                    false
+                }
+            });
         }
     }
 
-    println!("Part 1 total: {}", total);
-    println!("Part 2 total: {}", part_2_total);
+    let file = File::open("input3.txt").expect("Could not open file");
+
+    let mut lines: Vec<String> = vec![];
+    let mut shared_chars: Vec<char> = vec![];
+    let mut shared_priority_sum = 0;
+
+    for line in std::io::BufReader::new(file).lines() {
+        if let Ok(line) = line {
+            lines.push(line.clone());
+
+            if lines.len() == 3 {
+                
+                // find all matches between first two lines
+                lines[0].chars().any(|c| {
+                    if lines[1].contains(c) {
+                        shared_chars.push(c);
+                        false // false allows us to check for all matches, not just one
+                    } else {
+                        false
+                    }
+                });
+
+                shared_chars.dedup();
+
+                let pass_one_shared_chars = shared_chars.clone();
+
+                shared_chars.clear();
+
+                // find all matches between the above matches and line 3
+                lines[2].chars().any(|c| {
+                    if pass_one_shared_chars.contains(&c) {
+                        shared_chars.push(c);
+
+                        shared_priority_sum += get_char_value(&c);
+                        true
+                    } else {
+                        false
+                    }
+                });
+
+                println!("Shared chars: {:?}", shared_chars);
+
+                shared_chars.clear();
+                lines.clear();
+            }
+        }
+    }
+
+    println!("Priority sum: {}", priority_sum);
+    println!("Shared priority sum: {}", shared_priority_sum);
 }
