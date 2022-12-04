@@ -1,79 +1,42 @@
 use std::fs::File;
 use std::io::BufRead;
 
-fn get_char_value(c: &char) -> u32 {
-    match c.is_ascii_lowercase() {
-        true => *c as u32 - 96,
-        false => *c as u32 - 64 + 26,
-    }
-}
-
 fn main() {
-    let file = File::open("input3.txt").expect("Could not open file");
+    // part 1
+    let mut full_overlap = 0;
 
-    let mut priority_sum = 0;
-
+    let file = File::open("input4.txt").expect("Could not open file");
     for line in std::io::BufReader::new(file).lines() {
         if let Ok(line) = line {
-            line[0..line.len() / 2].chars().any(|c| {
-                if line[line.len() / 2..].contains(c) {
-                    priority_sum += get_char_value(&c);
-                    true
-                } else {
-                    false
-                }
-            });
+            let line = line.replace(",", "-");
+            let split = line.split::<&str>("-").collect::<Vec::<&str>>();
+            let elf1: Vec::<i32> = (split[0].parse::<i32>().unwrap()..split[1].parse::<i32>().unwrap() + 1).collect();
+            let elf2: Vec::<i32> = (split[2].parse::<i32>().unwrap()..split[3].parse::<i32>().unwrap() + 1).collect();
+            
+            if elf1.iter().all(|x| elf2.contains(x)) || elf2.iter().all(|x| elf1.contains(x)) {
+                full_overlap += 1;
+            }
         }
     }
+    
+    println!("Full overlaps: {}", full_overlap);
 
-    let file = File::open("input3.txt").expect("Could not open file");
-
-    let mut lines: Vec<String> = vec![];
-    let mut shared_chars: Vec<char> = vec![];
-    let mut shared_priority_sum = 0;
-
+    // part 2
+    let mut partial_overlap = 0;
+    let file = File::open("input4.txt").expect("Could not open file");
     for line in std::io::BufReader::new(file).lines() {
         if let Ok(line) = line {
-            lines.push(line.clone());
-
-            if lines.len() == 3 {
-                
-                // find all matches between first two lines
-                lines[0].chars().any(|c| {
-                    if lines[1].contains(c) {
-                        shared_chars.push(c);
-                        false // false allows us to check for all matches, not just one
-                    } else {
-                        false
-                    }
-                });
-
-                shared_chars.dedup();
-
-                let pass_one_shared_chars = shared_chars.clone();
-
-                shared_chars.clear();
-
-                // find all matches between the above matches and line 3
-                lines[2].chars().any(|c| {
-                    if pass_one_shared_chars.contains(&c) {
-                        shared_chars.push(c);
-
-                        shared_priority_sum += get_char_value(&c);
-                        true
-                    } else {
-                        false
-                    }
-                });
-
-                println!("Shared chars: {:?}", shared_chars);
-
-                shared_chars.clear();
-                lines.clear();
+            let line = line.replace(",", "-");
+            let split = line.split::<&str>("-").collect::<Vec::<&str>>();
+            let elf1: Vec::<i32> = (split[0].parse::<i32>().unwrap()..split[1].parse::<i32>().unwrap() + 1).collect();
+            let elf2: Vec::<i32> = (split[2].parse::<i32>().unwrap()..split[3].parse::<i32>().unwrap() + 1).collect();
+            
+            if elf1.iter().any(|x| elf2.contains(x)) || elf2.iter().any(|x| elf1.contains(x)) {
+                partial_overlap += 1;
             }
         }
     }
 
-    println!("Priority sum: {}", priority_sum);
-    println!("Shared priority sum: {}", shared_priority_sum);
+    println!("partial overlaps: {}", partial_overlap);
+
 }
