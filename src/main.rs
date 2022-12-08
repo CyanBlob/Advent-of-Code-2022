@@ -1,189 +1,175 @@
 use std::fs::File;
 use std::io::BufRead;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
-struct Dir {
-    dirs: Vec<Dir>,
-    files: Vec<File_>,
-    path: String,
-    parent_path: String,
+#[derive(Debug, Eq, Ord, Clone, Copy)]
+struct Tree {
+    tree: u32,
+    added: bool,
+    visible_left: usize,
+    visible_right: usize,
+    visible_up: usize,
+    visible_down: usize,
 }
 
-impl Dir {
-    fn navigate_to(&mut self, path: &str) -> &mut Dir {
-        if !self.contains_dir(path) {
-            self.add_dir(path);
+impl PartialOrd for Tree {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self.tree.partial_cmp(&other.tree) {
+            ord => return ord,
+        }
+    }
+}
+
+impl PartialEq for Tree {
+    fn eq(&self, other: &Self) -> bool {
+        self.tree == other.tree
+    }
+}
+
+fn count_left_to_right(trees: &mut Vec<Vec<Tree>>) -> usize {
+    let mut visible: usize = 0;
+    let mut checked_rows = 0;
+    let height = trees.len();
+    let width = trees.iter().nth(0).unwrap().len();
+
+    let mut max_score = 0;
+
+    for row in trees {
+        if checked_rows == 0 || checked_rows == height - 1 {
+            checked_rows += 1;
+            continue;
         }
 
-        self.get_dir(path).unwrap()
-    }
+        checked_rows += 1;
 
-    fn navigate_to_from_root(&mut self, path: &str) -> &mut Dir {
-        self.get_dir_from_root(path)
-    }
-
-    fn contains_dir(&self, path: &str) -> bool {
-        self.dirs.iter().any(|d| d.path == path)
-    }
-
-    fn get_dir(&mut self, path: &str) -> Option<&mut Dir> {
-        let current_dir: &mut Dir = self;
-
-        current_dir
-            .dirs
-            .iter_mut()
-            .find(|v| v.path == path.to_string())
-    }
-
-    fn get_dir_from_root(&mut self, path: &str) -> &mut Dir {
-        let split_path = path.split("/").collect::<Vec<&str>>();
-
-        let mut current_dir: &mut Dir = self;
-
-        for dir in split_path {
-            if dir == "" {
+        let _row = row.clone();
+        for (i, tree) in row.iter_mut().enumerate() {
+            if i + 1 == _row.len() || i == 0 {
                 continue;
             }
-            current_dir = current_dir
-                .dirs
-                .iter_mut()
-                .find(|v| v.path.split("/").collect::<Vec<&str>>().first().unwrap() == &dir)
-                .unwrap();
+            if !tree.added
+                && (_row[0..i].iter().max().unwrap() < tree
+                    || _row[i + 1..].iter().max().unwrap() < tree)
+            {
+                visible = visible + 1;
+                tree.added = true;
+            }
+
+            let mut blocked_left = 0;
+            if tree.added {
+                let visible_left = _row[0..i]
+                    .iter()
+                    .rev()
+                    .enumerate()
+                    .find(|(j, other_tree)| {
+                        if other_tree.tree >= tree.tree {
+                            blocked_left = 1;
+                            return true;
+                        }
+                        false
+                    })
+                    .unwrap_or((
+                        i,
+                        &Tree {
+                            tree: 9,
+                            added: false,
+                            visible_left: 0,
+                            visible_right: 0,
+                            visible_up: 0,
+                            visible_down: 0,
+                        },
+                    ));
+
+                let mut blocked_right = 0;
+                let visible_right = _row[i + 1..]
+                    .iter()
+                    .enumerate()
+                    .find(|(j, other_tree)| {
+                        if other_tree.tree >= tree.tree {
+                            blocked_right = 1;
+                            return true;
+                        }
+                        false
+                    })
+                    .unwrap_or((
+                        width - i - 1,
+                        &Tree {
+                            tree: 9,
+                            added: false,
+                            visible_left: 0,
+                            visible_right: 0,
+                            visible_up: 0,
+                            visible_down: 0,
+                        },
+                    ));
+
+                tree.visible_left = visible_left.0 + blocked_left;
+                tree.visible_right = visible_right.0 + blocked_right;
+
+                let tree_score =
+                    tree.visible_down * tree.visible_left * tree.visible_right * tree.visible_up;
+
+                if tree_score > max_score {
+                    max_score = tree_score;
+                }
+            }
         }
-        current_dir
     }
 
-    fn add_dir(&mut self, path: &str) {
-        self.dirs.push(Dir {
-            dirs: vec![],
-            files: vec![],
-            path: path.to_string(),
-            parent_path: self.parent_path.to_string() + &self.path.to_string() + "/",
-            //parent: None,
-        })
-    }
-
-    fn add_file(&mut self, size: usize) {
-        self.files.push(File_ { size });
-    }
-
-    fn get_size(&self, total: &mut usize) -> usize {
-        let file_size = self
-            .files
-            .iter()
-            .fold(0, |sum, val| sum + val.size as usize);
-        let dir_size = self.dirs.iter().fold(0, |sum, val| sum + val.get_size(total));
-
-        if file_size + dir_size <= 100000 {
-            *total += file_size + dir_size;
-        }
-        
-        
-        file_size + dir_size
-    }
-
-    fn get_smallest_for_target(&self, total: &mut usize, smallest_for_target: &mut usize, target: &usize) -> usize {
-        
-        let file_size = self
-            .files
-            .iter()
-            .fold(0, |sum, val| sum + val.size as usize);
-        let dir_size = self.dirs.iter().fold(0, |sum, val| sum + val.get_smallest_for_target(total, smallest_for_target, target));
-
-        let total_size = file_size + dir_size;
-
-        *total += total_size;
-
-        if total_size > *target && total_size < *smallest_for_target {
-            println!("Old selection: {}", smallest_for_target);
-            *smallest_for_target = total_size;
-            println!("New selection: {}", smallest_for_target);
-        }
-
-        total_size
-    }
+    println!("Max score: {}", max_score);
+    visible
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
-struct File_ {
-    size: usize,
-}
+fn count_top_to_bottom(trees: &Vec<Vec<Tree>>) -> usize {
+    let mut rotated_trees: Vec<Vec<Tree>> = vec![];
 
-enum Command<'a> {
-    Cd(&'a str),
-    Ls,
-}
+    let height = trees.len();
+    let width = trees.iter().nth(0).unwrap().len();
 
-fn input_to_command(input: &str) -> Command {
-    let split_input: Vec<&str> = input.split(" ").collect();
+    for _ in 0..trees.len() {
+        rotated_trees.push(vec![]);
+    }
 
-    match split_input[0] {
-        "cd" => Command::Cd(split_input[1]),
-        "ls" => Command::Ls,
-        _ => {
-            panic!("Invalid command")
+    for row in trees {
+        for (i, tree) in row.iter().enumerate() {
+            let mut rotated_tree = tree.clone();
+            rotated_tree.visible_up = rotated_tree.visible_left;
+            rotated_tree.visible_down = rotated_tree.visible_right;
+            rotated_tree.visible_left = 0;
+            rotated_tree.visible_right = 0;
+            rotated_trees[i].push(rotated_tree);
         }
     }
+
+    count_left_to_right(&mut rotated_trees) + height * 2 + width * 2 - 4
 }
 
 fn main() {
-    let file = File::open("input7.txt").expect("Could not open file");
+    let mut trees: Vec<Vec<Tree>> = vec![];
 
-    let mut root = Dir {
-        dirs: vec![],
-        files: vec![],
-        path: "/".to_string(),
-        parent_path: "/".to_string(),
-    };
-
-    let mut current_dir = &mut root;
-
-    let mut current_path: String;
-
-    for line in std::io::BufReader::new(file).lines() {
+    // left to right
+    let file = File::open("input8.txt").expect("Could not open file");
+    for (row, line) in std::io::BufReader::new(file).lines().enumerate() {
         if let Ok(line) = line {
-            if &line[0..1] == "$" {
-                match input_to_command(&line[2..line.len()]) {
-                    Command::Cd(path) => {
-                        //println!("CD: {}", path);
-                        current_path = current_dir.parent_path.to_string();
-                        match path {
-                            "/" => current_dir = &mut root,
-                            ".." => current_dir = root.navigate_to_from_root(&current_path),
-                            _sub_path => current_dir = current_dir.navigate_to(path),
-                        }
-                    }
-                    Command::Ls => {} // woops, forgot to use *shrug*
-                }
-            } else {
-                if line.contains("dir ") {
-                    current_dir.add_dir(line.split(" ").collect::<Vec<&str>>().last().unwrap());
-                } else {
-                    current_dir.add_file(
-                        line.split(" ")
-                            .collect::<Vec<&str>>()
-                            .first()
-                            .unwrap()
-                            .parse()
-                            .unwrap(),
-                    );
-                }
-            }
+            trees.push(vec![]);
+            trees[row] = line
+                .chars()
+                .into_iter()
+                .map(|t| Tree {
+                    tree: t.to_digit(10).unwrap(),
+                    added: false,
+                    visible_left: 0,
+                    visible_right: 0,
+                    visible_up: 0,
+                    visible_down: 0,
+                })
+                .collect::<Vec<Tree>>();
+
         }
     }
 
-    let mut sum = 0;
-    current_dir = &mut root;
-    let total = current_dir.get_size(&mut sum);
-    let free = 70000000 - total;
-    let target = 30000000 - free;
-    
-    
-    let mut smallest = 70000000;
-    
-    current_dir.get_smallest_for_target(&mut sum, &mut smallest, &target);
-    
-    println!("Free: {}", free);
-    println!("Target: {}", target);
-    println!("Smallest for target: {}", smallest);
+    let mut visible: usize = count_left_to_right(&mut trees);
+
+    visible += count_top_to_bottom(&trees);
+
+    println!("Visible: {}", visible);
 }
